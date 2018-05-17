@@ -1,9 +1,9 @@
 node_modules
-bower_components
 dist
 
 .tmp
 .sass-cache
+.update
 .DS_Store
 .idea
 
@@ -12,3 +12,6 @@ test/reports
 
 protractor.lab.conf.js
 /hosted
+local.log
+
+LOCAL_IP

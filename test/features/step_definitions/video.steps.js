@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Longtail Ad Solutions Inc.
+ * Copyright 2017 Longtail Ad Solutions Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,247 +14,132 @@
  * governing permissions and limitations under the License.
  **/
 
-var FACEBOOK_SHARE_URL = 'https://www.facebook.com/sharer/sharer.php';
-var TWITTER_SHARE_URL  = 'http://twitter.com/share';
-var EMAIL_SHARE_URL    = 'mailto:';
+const
+    {defineSupportCode} = require('cucumber');
 
-var stepsDefinition = function () {
+defineSupportCode(function ({Given, When, Then}) {
 
-    this.When(/^I scroll to the related slider$/, function (callback) {
 
-        browser
-            .findElement(by.css('.jw-row[ng-if="vm.recommendationsFeed"]'))
-            .then(scrollToElement)
-            .then(callback);
+    //
+    // Given steps
+    //
+
+    Given('I scroll to the next up slider', function () {
+        return scrollToElement($('.jw-card-slider[feed="vm.activeFeed"]'));
     });
 
-    this.When(/^I start video playback$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jwplayer'))
-            .getAttribute('class')
-            .then(function (className) {
-
-                if (className.indexOf('jw-flag-touch') !== -1) {
-                    return browser
-                        .touchActions()
-                        .tap(element(by.css('.jwplayer .jw-icon-display')))
-                        .perform();
-                }
-
-                // ie doesn't start the video with a click
-                if (className.indexOf('jw-ie') !== -1) {
-                    return browser
-                        .executeScript(function () {
-                            jwplayer().play(true);
-                        })
-                        .then(callback);
-                }
-
-                browser
-                    .findElement(by.css('.jwplayer .jw-video'))
-                    .click();
-            })
-            .then(delay(callback, 2000));
+    Given('I scroll to the related videos slider', function () {
+        return scrollToElement($('.jw-card-slider[feed="vm.extraFeed"]'));
     });
 
-    this.When(/^I click on the (\d+)(?:st|nd|rd|th) visible card in the more like this slider$/, function (num, callback) {
+    //
+    // When steps
+    //
 
-        browser
-            .findElements(by.css('.jw-card-slider[feed="vm.feed"] .jw-card-slider-slide.is-visible'))
-            .then(function (elements) {
-                return elements[num - 1]
-                    .findElement(by.css('.jw-card-container'))
-                    .click();
-            })
-            .then(callback);
+    When('I wait until the video is loaded', function () {
+        return browser.wait(function () {
+            return $('body').isElementPresent(by.css('.jw-preview'));
+        });
     });
 
-    this.When(/^I start playing the next playlist item$/, function (callback) {
-
-        browser
-            .executeScript(function () {
-                jwplayer().playlistNext();
-            })
-            .then(callback);
+    When('I start video playback', function () {
+        return browser.executeScript('jwplayer().play()');
     });
 
-    this.When(/^I wait until the overlay disappears$/, function (callback) {
-
-        browser
-            .sleep(5000)
-            .then(callback);
-    });
-
-    this.When(/^I wait until the video starts playing$/, function (callback) {
-
-        browser
-            .executeAsyncScript(function (callback) {
-                jwplayer().on('time', function onTime (evt) {
-                    if (evt.position > 1) {
-                        jwplayer().off('time', onTime);
-                        callback();
-                    }
-                });
-            })
-            .then(callback);
-    });
-
-    this.When(/^I scroll to the more like this slider$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jw-card-slider[feed="vm.feed"]'))
-            .then(scrollToElement)
-            .then(callback);
-    });
-
-    this.When(/^I seek to the end of video$/, function (callback) {
-
-        browser
-            .executeScript(function () {
-                jwplayer().seek(jwplayer().getDuration());
-            })
-            .then(callback);
-    });
-
-    this.When(/^I seek to (\d+) seconds/, function (position, callback) {
-
-        browser
-            .executeAsyncScript(function (pos, callback) {
-                jwplayer().once('seeked', callback);
-                jwplayer().seek(pos);
-            }, [position])
-            .then(delay(callback, 200));
-    });
-
-    this.Then(/^the video not found page should be visible$/, function (callback) {
-
-        browser
-            .getCurrentUrl()
-            .then(function (url) {
-                expect(url).to.equal(browser.baseUrl + '/video-not-found');
-                callback();
+    When('I wait until the video is playing', function () {
+        return browser.wait(function () {
+            return browser.executeScript('return jwplayer().getState()').then(function (state) {
+                return state === 'playing';
             });
+        });
     });
 
-    this.Then(/^the video player is ready$/, function (callback) {
-
-        browser
-            .executeScript(function () {
-                return jwplayer().getState();
-            })
-            .then(function (state) {
-                expect(state).to.equal('idle');
-                callback();
-            });
+    When('I start playing the next playlist item', function () {
+        return browser.executeScript('jwplayer().playlistNext()');
     });
 
-    this.Then(/^the index loads$/, function (callback) {
+    When('I click on the {ordinal} visible card in the next up slider', function (num) {
+        const cardElement = $$('.jw-card-slider[feed="vm.activeFeed"] .jw-card-slider-slide.is-visible .jw-card')
+            .get(num - 1);
 
-        browser
-            .getCurrentUrl()
-            .then(function (currentUrl) {
-                expect(currentUrl).to.equal(browser.baseUrl + '/');
-                callback();
-            });
+        // safari does not trigger an actual click on the first click command
+        if (this.browserName === 'safari') {
+            return cardElement.click().click();
+        }
+
+        return cardElement.click();
     });
 
-    this.Then(/^the related videos title is shown$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jw-row[ng-if="vm.feed"]'))
-            .then(scrollToElement)
-            .then(function () {
-                return browser
-                    .findElement(by.css('.jw-row[ng-if="vm.feed"]'))
-                    .findElement(by.css('.jw-card-slider-flag-default'))
-                    .findElement(by.css('.jw-card-slider-title'))
-                    .getText();
-            })
-            .then(function (title) {
-
-                // title can contain an icon and multiple whitespaces
-                title = title
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
-
-                expect(title).to.equal('More like this (9)');
-                callback();
-            });
+    When('I expand the video description', function () {
+        return $$('.jw-collapsible-text-toggle .jw-button').then(function (elements) {
+            // optional, toggle button could be hidden
+            if (elements[0]) {
+                return elements[0].click();
+            }
+        });
     });
 
-    this.Then(/^the video details should show the duration$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jw-video-details .jw-video-duration'))
-            .getText()
-            .then(function (txt) {
-                var text = txt.trim().split(' ');
-                expect(text[1]).to.equal('min');
-                expect(isNaN(text[0])).to.equal(false);
-                callback();
-            });
+    When('I click the first video tag', function () {
+        return $$('.jw-video-details-tag').get(0).click();
     });
 
-    this.Then(/^the play icon should be visible$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jw-display-icon-container .jw-icon-display'))
-            .isDisplayed()
-            .then(function (isDisplayed) {
-                expect(isDisplayed).to.equal(true);
-                callback();
-            });
+    When('I seek to the end of video', function () {
+        return browser.executeScript('jwplayer().seek(jwplayer().getDuration() - 2)');
     });
 
-    this.Then(/^the video title and description should be visible$/, function (callback) {
-
-        browser
-            .findElement(by.css('.jw-video-details'))
-            .isDisplayed()
-            .then(function (isDisplayed) {
-                expect(isDisplayed).to.equal(true);
-                callback();
-            });
+    When('I scroll to the video description', function () {
+        return scrollToElement($('.jw-collapsible-text-toggle'));
     });
 
-    this.Then(/^the video should be paused$/, function (callback) {
+    //
+    // Then steps
+    //
 
-        browser
-            .executeScript(function () {
-                return jwplayer().getState();
-            })
-            .then(function (state) {
-                expect(state).to.match(/^paused|idle/);
-                callback();
-            });
+    Then('the video should be playing', function () {
+        return expect(browser.executeScript('return jwplayer().getState()'))
+            .to.eventually.match(/playing|buffering/);
     });
 
-    this.Then(/^the video should be playing$/, function (callback) {
-
-        browser
-            .executeScript(function () {
-                return jwplayer().getState();
-            })
-            .then(function (state) {
-                expect(state).to.match(/^playing|buffering/);
-                callback();
-            });
+    Then('the play icon should be visible', function () {
+        return expect($('.jw-display-icon-container .jw-icon-display').isDisplayed()).to.eventually.equal(true);
     });
 
-    this.Then(/^the video progress should be greater than (\d+)%$/, function (progress, callback) {
+    Then('the video title is {stringInDoubleQuotes}', function (title) {
+        function trim (text) {
+            return text.replace(/\s/g, '');
+        }
 
-        progress = parseInt(progress) / 100;
+        title = trim(title);
 
-        browser
-            .executeScript(function () {
-                return jwplayer().getPosition() / jwplayer().getDuration();
-            })
-            .then(function (currentProgress) {
-                expect(currentProgress).to.be.greaterThan(progress);
-                callback();
-            });
+        return expect($('.jw-video-details .jw-video-details-title').getText().then(trim)).to.eventually.equal(title);
     });
-};
 
-module.exports = stepsDefinition;
+    Then('the video title is above the video', function () {
+        return expect($$('.jw-video-details-flag-above .jw-video-details-title').count()).to.eventually
+            .equal(1);
+    });
+
+    Then('the video description is:', function (description) {
+        return expect($('.jw-video-details .jw-video-details-description .jw-markdown').getText()).to.eventually
+            .equal(description);
+    });
+
+    Then('the video duration label is {stringInDoubleQuotes}', function (duration) {
+        return expect($('.jw-video-details .jw-video-details-duration').getText()).to.eventually.equal(duration);
+    });
+
+    Then('the next up title is shown', function () {
+        return expect($('.jw-card-slider[feed="vm.activeFeed"] .jw-card-slider-title').isDisplayed()).to.eventually
+            .equal(true);
+    });
+
+    Then('the related videos title is shown', function () {
+        return expect($('.jw-card-slider[feed="vm.extraFeed"] .jw-card-slider-title').isDisplayed()).to.eventually
+            .equal(true);
+    });
+
+    Then('the video tags should be visible', function () {
+        return expect($$('.jw-video-details-tag').get(0).isDisplayed()).to.eventually.equal(true);
+    });
+
+});
